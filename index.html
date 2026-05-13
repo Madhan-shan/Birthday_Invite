@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#080510" />
+  <title>You're Invited 🎉</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #080510;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* ── full-viewport stage ── */
+    #stage {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #080510;
+    }
+
+    /* ── ambient glow behind video ── */
+    #glow {
+      position: absolute;
+      inset: -20%;
+      background: radial-gradient(ellipse 60% 70% at 50% 50%,
+        rgba(180, 100, 220, 0.35) 0%,
+        rgba(80,  40, 160, 0.20) 40%,
+        transparent 75%);
+      animation: breathe 5s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: .7; transform: scale(1);    }
+      50%       { opacity: 1;  transform: scale(1.06); }
+    }
+
+    /* ── video wrapper keeps 9:16 ── */
+    #video-wrap {
+      position: relative;
+      /* fill height on portrait phones; clamp width on landscape/desktop */
+      height: 100dvh;
+      aspect-ratio: 9 / 16;
+      max-width: 100vw;
+      max-height: 100dvh;
+      border-radius: 0px;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    /* on wider screens show subtle rounded frame */
+    @media (min-aspect-ratio: 9/16) {
+      #video-wrap {
+        height: 100dvh;
+        width: auto;
+        border-radius: 28px;
+        box-shadow: 0 0 80px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.06);
+      }
+    }
+
+    #invite-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* ── loading splash ── */
+    #loader {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: #080510;
+      z-index: 10;
+      transition: opacity .6s ease, visibility .6s ease;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; }
+
+    .loader-ring {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(255,255,255,.08);
+      border-top-color: #c97bdc;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loader-text {
+      font-size: 13px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.3);
+      animation: pulse-text 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-text { 0%,100%{opacity:.3} 50%{opacity:.7} }
+
+    /* ── tap-to-play overlay (autoplay blocked) ── */
+    #tap-play {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      background: rgba(8,5,16,.72);
+      backdrop-filter: blur(6px);
+      z-index: 9;
+      cursor: pointer;
+    }
+    #tap-play.show { display: flex; }
+
+    .play-circle {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.12);
+      border: 2px solid rgba(255,255,255,.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px;
+      animation: pop-in .4s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @keyframes pop-in { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    #tap-play p {
+      font-size: 14px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.55);
+    }
+
+    /* ── mute toggle ── */
+    #mute-btn {
+      position: absolute;
+      bottom: max(28px, env(safe-area-inset-bottom, 28px));
+      right: 18px;
+      z-index: 20;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,.2);
+      background: rgba(8,5,16,.55);
+      backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 19px;
+      color: #fff;
+      transition: background .2s, transform .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #mute-btn:active { transform: scale(.9); }
+    #mute-btn.hidden { display: none; }
+
+    /* ── confetti burst (CSS only) ── */
+    .burst { position: absolute; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+    .bit {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 8px; height: 8px;
+      border-radius: 2px;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="glow"></div>
+
+  <div id="video-wrap">
+
+    <!-- loading state -->
+    <div id="loader">
+      <div class="loader-ring"></div>
+      <div class="loader-text">Opening your invite…</div>
+    </div>
+
+    <!-- tap-to-play fallback -->
+    <div id="tap-play" onclick="startPlay()">
+      <div class="play-circle">▶</div>
+      <p>Tap to open invite</p>
+    </div>
+
+    <!--
+      ┌─────────────────────────────────────────────────────────┐
+      │  PUT YOUR VIDEO FILE IN THE SAME FOLDER AS index.html   │
+      │  and rename it   invite.mp4                             │
+      │  (also add  invite.webm  as fallback if you have it)    │
+      └─────────────────────────────────────────────────────────┘
+    -->
+    <video
+      id="invite-video"
+      playsinline
+      muted
+      loop
+      preload="auto"
+    >
+      <source src="invite.mp4"  type="video/mp4" />
+      <source src="invite.webm" type="video/webm" />
+    </video>
+
+    <!-- confetti canvas -->
+    <div class="burst" id="burst"></div>
+
+  </div>
+
+  <!-- mute toggle (shown after video plays) -->
+  <button id="mute-btn" class="hidden" onclick="toggleMute()" aria-label="Toggle sound">🔇</button>
+</div>
+
+<script>
+  const video   = document.getElementById('invite-video');
+  const loader  = document.getElementById('loader');
+  const tapPlay = document.getElementById('tap-play');
+  const muteBtn = document.getElementById('mute-btn');
+
+  /* ── hide loader once enough is buffered ── */
+  function hideLoader() {
+    loader.classList.add('hidden');
+  }
+
+  video.addEventListener('canplay', hideLoader);
+  // fallback: if no video file, hide loader after 2s anyway
+  setTimeout(hideLoader, 2000);
+
+  /* ── attempt silent autoplay ── */
+  video.addEventListener('canplay', () => {
+    video.play().then(() => {
+      tapPlay.classList.remove('show');
+      revealMute();
+      fireConfetti();
+      /* unmute after brief moment so autoplay isn't blocked */
+      setTimeout(() => { video.muted = false; updateMuteIcon(); }, 800);
+    }).catch(() => {
+      /* autoplay blocked — show tap overlay */
+      tapPlay.classList.add('show');
+    });
+  }, { once: true });
+
+  function startPlay() {
+    video.muted = false;
+    video.play().then(() => {
+      tapPlay.classList.remove('show');
+      revealMute();
+      fireConfetti();
+      updateMuteIcon();
+    });
+  }
+
+  function revealMute() {
+    muteBtn.classList.remove('hidden');
+  }
+
+  function toggleMute() {
+    video.muted = !video.muted;
+    updateMuteIcon();
+  }
+
+  function updateMuteIcon() {
+    muteBtn.textContent = video.muted ? '🔇' : '🔊';
+  }
+
+  /* ── confetti burst on play ── */
+  function fireConfetti() {
+    const wrap   = document.getElementById('burst');
+    const colors = ['#d4a84b','#f0cc80','#c97bdc','#6ec5e4','#ff8fa3','#fff'];
+    const count  = 40;
+
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('div');
+      el.className = 'bit';
+      const angle  = (360 / count) * i + Math.random() * 20;
+      const dist   = 120 + Math.random() * 180;
+      const rad    = angle * Math.PI / 180;
+      const tx     = Math.cos(rad) * dist;
+      const ty     = Math.sin(rad) * dist;
+      const color  = colors[Math.floor(Math.random() * colors.length)];
+      const size   = 6 + Math.random() * 8;
+      const delay  = Math.random() * 0.15;
+
+      el.style.cssText = `
+        background: ${color};
+        width: ${size}px; height: ${size}px;
+        border-radius: ${Math.random() > .5 ? '50%' : '2px'};
+        animation: bit-fly .9s ${delay}s cubic-bezier(.2,.8,.4,1) both;
+        --tx: ${tx}px; --ty: ${ty}px;
+      `;
+      wrap.appendChild(el);
+    }
+
+    // inject keyframe once
+    if (!document.getElementById('bit-kf')) {
+      const style = document.createElement('style');
+      style.id = 'bit-kf';
+      style.textContent = `
+        @keyframes bit-fly {
+          0%   { opacity: 1; transform: translate(0,0) scale(1) rotate(0deg); }
+          100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(.4) rotate(480deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    setTimeout(() => wrap.innerHTML = '', 1400);
+  }
+</script>
+</body>
+</html>
