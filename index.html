@@ -3,19 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#080510" />
+  <meta name="theme-color" content="#000" />
   <title>You're Invited 🎉</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       overflow: hidden;
       background: #000;
     }
 
-    /* ── full viewport stage ── */
     #stage {
       position: fixed;
       inset: 0;
@@ -25,48 +23,26 @@
       background: #000;
     }
 
-    /* ── 9:16 clip box — NO border-radius, NO bevel ── */
     #video-wrap {
       position: relative;
-      /* portrait phones: fill full height */
       height: 100dvh;
       aspect-ratio: 9 / 16;
       max-width: 100vw;
       max-height: 100dvh;
-      overflow: hidden;           /* clips the iframe chrome */
+      overflow: hidden;
       background: #000;
-      border-radius: 0;           /* no beveling at all */
     }
 
-    /*
-      Google Drive embed has:
-        ~44 px  top toolbar (title + close)
-        ~52 px  bottom controls bar (play, scrub, volume, fullscreen)
-
-      Strategy: pull iframe UP by 44px and make it TALLER by 44+52 = 96px
-      so overflow:hidden clips away both chrome bars, leaving only the video.
-    */
-    #gdrive-frame {
+    #invite-video {
       position: absolute;
-      left: 0;
+      inset: 0;
       width: 100%;
-      top: -44px;
-      height: calc(100% + 96px);  /* +44 top clip + 52 bottom clip */
-      border: none;
-      pointer-events: auto;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
-    /* ── transparent shields — prevent clicks on Drive controls areas ── */
-    /* top shield covers the Drive title bar area */
-    .shield-top {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;                /* just a hairline; overflow:hidden does the real work */
-      z-index: 5;
-      pointer-events: none;
-    }
-
-    /* ── loading splash ── */
+    /* loading splash */
     #loader {
       position: absolute;
       inset: 0;
@@ -77,21 +53,18 @@
       gap: 18px;
       background: #080510;
       z-index: 20;
-      transition: opacity .8s ease, visibility .8s ease;
+      transition: opacity .7s ease, visibility .7s ease;
     }
-    #loader.hidden { opacity: 0; visibility: hidden; }
+    #loader.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
-    .loader-emoji {
-      font-size: 40px;
-      animation: bounce 1.6s ease-in-out infinite;
-    }
+    .loader-emoji { font-size: 42px; animation: bounce 1.6s ease-in-out infinite; }
     @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
 
     .loader-ring {
       width: 52px; height: 52px;
       border-radius: 50%;
       border: 2.5px solid rgba(255,255,255,.08);
-      border-top-color: #c97bdc;
+      border-top-color: #d4a84b;
       animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -104,7 +77,42 @@
       color: rgba(255,255,255,.3);
     }
 
-    /* ── confetti burst ── */
+    /* tap-to-play — only if autoplay blocked */
+    #tap-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: rgba(0,0,0,.5);
+      backdrop-filter: blur(8px);
+      z-index: 15;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #tap-overlay.show { display: flex; }
+
+    .tap-circle {
+      width: 76px; height: 76px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.4);
+      background: rgba(255,255,255,.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      animation: pop-in .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes pop-in { from{transform:scale(.4);opacity:0} to{transform:scale(1);opacity:1} }
+
+    .tap-label {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.6);
+    }
+
     #burst { position: absolute; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
   </style>
 </head>
@@ -113,73 +121,82 @@
 <div id="stage">
   <div id="video-wrap">
 
-    <!-- loading screen -->
     <div id="loader">
       <div class="loader-emoji">🎂</div>
       <div class="loader-ring"></div>
       <div class="loader-text">Opening your invite…</div>
     </div>
 
-    <!--
-      The iframe is pulled -44px up and made +96px taller.
-      overflow:hidden on #video-wrap clips the Drive toolbar (top 44px)
-      and the Drive controls bar (bottom 52px) out of view.
-    -->
-    <iframe
-      id="gdrive-frame"
-      src="https://drive.google.com/file/d/1uedMmGuD0gSZWJUQdjgcviq0U39FWC1I/preview?autoplay=1"
-      allow="autoplay; fullscreen"
-      allowfullscreen
-      loading="eager"
-    ></iframe>
+    <div id="tap-overlay" onclick="tapPlay()">
+      <div class="tap-circle">▶</div>
+      <div class="tap-label">Tap to open invite</div>
+    </div>
+
+    <video
+      id="invite-video"
+      src="https://github.com/Madhan-shan/Birthday_Invite/releases/download/untagged-c3d68b24208def9a4a64/invite.mp4"
+      playsinline
+      muted
+      autoplay
+      loop
+      preload="auto"
+    ></video>
 
     <div id="burst"></div>
   </div>
 </div>
 
 <script>
-  const loader = document.getElementById('loader');
+  const video      = document.getElementById('invite-video');
+  const loader     = document.getElementById('loader');
+  const tapOverlay = document.getElementById('tap-overlay');
 
-  document.getElementById('gdrive-frame').addEventListener('load', () => {
-    setTimeout(() => {
-      loader.classList.add('hidden');
+  video.addEventListener('canplay', () => {
+    loader.classList.add('hidden');
+    video.play().then(() => {
+      setTimeout(() => { video.muted = false; }, 600);
       fireConfetti();
-    }, 900);
-  });
+    }).catch(() => {
+      tapOverlay.classList.add('show');
+    });
+  }, { once: true });
 
-  // Hard fallback
-  setTimeout(() => loader.classList.add('hidden'), 7000);
+  setTimeout(() => loader.classList.add('hidden'), 8000);
+
+  function tapPlay() {
+    video.muted = false;
+    video.play().then(() => {
+      tapOverlay.classList.remove('show');
+      fireConfetti();
+    });
+  }
 
   function fireConfetti() {
     const wrap   = document.getElementById('burst');
-    const colors = ['#d4a84b','#f0cc80','#c97bdc','#6ec5e4','#ff8fa3','#fff'];
-    const count  = 50;
-
+    const colors = ['#d4a84b','#f0cc80','#c97bdc','#6ec5e4','#ff8fa3','#ffffff'];
+    const count  = 52;
     const kf = document.createElement('style');
     kf.textContent = `
       @keyframes bit-fly {
         0%   { opacity:1; transform:translate(0,0) scale(1) rotate(0deg); }
-        100% { opacity:0; transform:translate(var(--tx),var(--ty)) scale(.3) rotate(540deg); }
-      }
-    `;
+        100% { opacity:0; transform:translate(var(--tx),var(--ty)) scale(.25) rotate(540deg); }
+      }`;
     document.head.appendChild(kf);
-
     for (let i = 0; i < count; i++) {
       const el    = document.createElement('div');
       const angle = (360 / count) * i + Math.random() * 10;
-      const dist  = 120 + Math.random() * 220;
+      const dist  = 130 + Math.random() * 230;
       const rad   = angle * Math.PI / 180;
       const size  = 6 + Math.random() * 8;
-
       el.style.cssText = `
         position:absolute; top:50%; left:50%;
         width:${size}px; height:${size}px;
-        border-radius:${Math.random()>.5?'50%':'2px'};
-        background:${colors[Math.floor(Math.random()*colors.length)]};
+        border-radius:${Math.random() > .5 ? '50%' : '3px'};
+        background:${colors[Math.floor(Math.random() * colors.length)]};
         opacity:0;
-        --tx:${Math.cos(rad)*dist}px;
-        --ty:${Math.sin(rad)*dist}px;
-        animation:bit-fly 1s ${Math.random()*.2}s cubic-bezier(.2,.8,.4,1) both;
+        --tx:${Math.cos(rad) * dist}px;
+        --ty:${Math.sin(rad) * dist}px;
+        animation:bit-fly 1s ${Math.random() * .2}s cubic-bezier(.2,.8,.4,1) both;
       `;
       wrap.appendChild(el);
     }
